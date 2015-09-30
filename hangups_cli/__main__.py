@@ -4,6 +4,7 @@ import sys, os, logging, argparse, asyncio
 
 import appdirs
 import hangups
+from hangups.ui.utils import get_conv_name
 
 # Basic settings
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -40,14 +41,27 @@ class Cli(object):
     @asyncio.coroutine
     def on_connect(self):
         """Handle connecting for the first time (callback)"""
-        print('Connected')
+        # print('Connected')
         self.user_list, self.conv_list = yield from hangups.build_user_conversation_list(
             self.client
         )
 
-        print(self.conv_list.get_all())
+        self.print_output()
 
         self.quit()
+
+    def get_conversations(self):
+        convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
+        return "\n".join([get_conv_name(conv) for conv in convs])
+
+    def print_output(self):
+        output = None
+
+        if True:
+            output = self.get_conversations()
+
+        print(output)
+
 
     def quit(self):
         future = asyncio.async(self.client.disconnect())
