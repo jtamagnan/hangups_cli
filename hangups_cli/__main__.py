@@ -1,6 +1,7 @@
 #!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 
-import sys, os, logging, argparse, asyncio
+import sys, os, logging, argparse, asyncio, argcomplete
 
 import appdirs
 import hangups
@@ -13,10 +14,14 @@ MESSAGE_DATETIME_FORMAT = '\n< %y-%m-%d >\n(%I:%M:%S %p)'
 
 class Cli(object):
     """QHangups main widget (icon in system tray)"""
-    def __init__(self, refresh_token_path):
+    def __init__(self, refresh_token_path, conversation_path, command, optional_command):
         # self.set_language()
 
         self.refresh_token_path = refresh_token_path
+        self.conversation_path = conversation_path
+        self.command = command
+        self.optional_command = optional_command
+
         self.hangups_running = False
         self.client = None
 
@@ -48,9 +53,14 @@ class Cli(object):
             self.client
         )
 
-        yield from self.print_output()
+        yield from self.parse_command()
+        yield from self.parse_optional_command()
 
         self.quit()
+
+    def save_conversations_list(self):
+        with open(self.conversation_path, 'w') as conv_file:
+            conv_file.write(self.get_conversations())
 
     def get_conversations(self):
         convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
@@ -72,18 +82,30 @@ class Cli(object):
         return output
 
     @asyncio.coroutine
+    def parse_command(self):
+        print_commands = {"get"}
+        do_commands = {"send"}
+        if self.command[0] in print_commands:
+            yield from self.print_output()
+        elif self.command[0] in do_commands:
+            yield from self.do_command()
+
+    @asyncio.coroutine
+    def parse_optional_command(self):
+        if "update_list" in self.optional_command:
+            self.save_conversations_list()
+
+    @asyncio.coroutine
     def print_output(self):
         output = None
-
-        command = "get_conversations"
-
-        if command == "get_conversations":
-            output = self.get_conversations()
-        elif command == 'get_conversation':
-            convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
-            output = yield from self.get_conversation(convs[1].id_)
-
+        if self.command[0] == 'get':
+            # convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
+            output = yield from self.get_conversation(self.command[1])
         print(output)
+
+    @asyncio.coroutine
+    def do_command(self):
+        raise NotImplementedError("Send")
 
 
     def quit(self):
@@ -167,20 +189,71 @@ def main():
     dirs = appdirs.AppDirs('hangups_cli', 'hangups_cli')
     default_log_path = os.path.join(dirs.user_data_dir, 'hangups.log')
     default_token_path = os.path.join(dirs.user_data_dir, 'refresh_token.txt')
+    conversation_path = os.path.join(dirs.user_data_dir, 'conversation_list.txt')
+
+    conversation_map = {}
+    with open(conversation_path, 'r') as conv_file:
+        for line in conv_file.readlines():
+            split = line.split(':')
+            key = split[1].strip().replace(" ", "_")
+            value = split[0].strip()
+            if key in conversation_map:
+                count = 1
+                while key + "_" +  str(count) in conversation_map:
+                    count += 1
+                conversation_map[key + "_" + str(count)] = value
+            else:
+                conversation_map[key] = value
+
+    conversation_choices = sorted(list(conversation_map.keys()),
+                                  key=lambda x:'zzz' + x if x[:7] == "Unknown" else x)
 
     # Setup command line argument parser
     parser = argparse.ArgumentParser(prog='hangups_cli',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    subparsers = parser.add_subparsers(help="sub-command help")
+
+    send_message = subparsers.add_parser("send", help="Send Message")
+    send_message.add_argument('To', choices=conversation_choices,
+                              help="Which Conversation To Message",
+                              metavar="To")
+    send_message.add_argument('Message', help="The message to send")
+
+    send_message = subparsers.add_parser("get", help="Get Messages")
+    send_message.add_argument('From', choices=conversation_choices,
+                              help="Which conversation to Read",
+                              metavar="From")
+
     parser.add_argument('-d', '--debug', action='store_true',
                         help='log detailed debugging messages')
+    parser.add_argument('-U', '--update', action='store_false',
+                        help='Do not refresh stored conversation list')
     parser.add_argument('--log', default=default_log_path,
                         help='log file path')
-    parser.add_argument('--token', default=default_token_path,
-                        help='OAuth refresh token storage path')
-    args = parser.parse_args()
+
+
+    argcomplete.autocomplete(parser)
+    args = vars(parser.parse_args())
+
+    print(args)
+
+    command = []
+    if args["From"]:
+        command.append("get")
+        command.append(conversation_map[args["From"]])
+    elif args["To"]:
+        command.append("send")
+        command.append(conversation_map[args["To"]])
+        command.append(args["Message"])
+
+    optional_command = set()
+    if args["update"]:
+        optional_command.add("update_list")
+
 
     # Create all necessary directories.
-    for path in [args.log, args.token]:
+    for path in [args["log"], default_token_path, conversation_path]:
         directory = os.path.dirname(path)
         if directory and not os.path.isdir(directory):
             try:
@@ -189,12 +262,12 @@ def main():
                 sys.exit('Failed to create directory: {}'.format(e))
 
     # Setup logging
-    log_level = logging.DEBUG if args.debug else logging.WARNING
-    logging.basicConfig(filename=args.log, level=log_level, format=LOG_FORMAT)
+    log_level = logging.DEBUG if args["debug"] else logging.WARNING
+    logging.basicConfig(filename=args['log'], level=log_level, format=LOG_FORMAT)
     # asyncio's debugging logs are VERY noisy, so adjust the log level
     logging.getLogger('asyncio').setLevel(logging.WARNING)
 
-    cli = Cli(args.token)
+    cli = Cli(default_token_path, conversation_path, command, optional_command)
 
 
 if __name__ == "__main__":
