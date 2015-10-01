@@ -8,6 +8,8 @@ from hangups.ui.utils import get_conv_name
 
 # Basic settings
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+MESSAGE_TIME_FORMAT = '(%I:%M:%S %p)'
+MESSAGE_DATETIME_FORMAT = '\n< %y-%m-%d >\n(%I:%M:%S %p)'
 
 class Cli(object):
     """QHangups main widget (icon in system tray)"""
@@ -46,7 +48,7 @@ class Cli(object):
             self.client
         )
 
-        self.print_output()
+        yield from self.print_output()
 
         self.quit()
 
@@ -54,30 +56,32 @@ class Cli(object):
         convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
         return "\n".join([str(conv.id_) + " : " + get_conv_name(conv) for conv in convs])
 
+    @asyncio.coroutine
     def get_conversation(self, conversation_id):
         conversation = self.conv_list.get(conversation_id)
+        print(get_conv_name(conversation))
+        event0 = conversation._events[0]
+        events = yield from conversation.get_events(event0.id_)
+        events.append(event0)
+        print(len(events))
         output = ""
-        for event in conversation.get_events():
-            ev = self._is_event_displayable(conversation, event)
+        for event in events:
+            ev = Message.from_conversation_event(conversation, event, None)
             if ev is not None:
-                output += ev.text() + "\n"
+                output += str(ev.text) + "\n"
         return output
 
-    def _is_event_displayable(self, conversation, conv_event):
-        """Return True if the ConversationWidget is displayable."""
-        widget = MessageWidget.from_conversation_event(conversation,
-                                                       conv_event, None)
-        return widget is not None
-
+    @asyncio.coroutine
     def print_output(self):
         output = None
 
-        command = "get_conversation"
+        command = "get_conversations"
 
         if command == "get_conversations":
             output = self.get_conversations()
-        else:
-            output = self.get_conversation(self.conv_list.get_all()[0].id_)
+        elif command == 'get_conversation':
+            convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
+            output = yield from self.get_conversation(convs[1].id_)
 
         print(output)
 
@@ -85,6 +89,76 @@ class Cli(object):
     def quit(self):
         future = asyncio.async(self.client.disconnect())
         future.add_done_callback(lambda future: future.result())
+
+class Message(object):
+
+    """Widget for displaying a single message in a conversation."""
+
+    def __init__(self, timestamp, text, user=None, show_date=False):
+        # Save the timestamp as an attribute for sorting.
+        self.timestamp = timestamp
+        text = [
+            ('msg_date', self._get_date_str(timestamp,
+                                            show_date=show_date) + ' '),
+            ('msg_text', text)
+        ]
+        if user is not None:
+            text.insert(1, ('msg_sender', user.first_name + ': '))
+
+        self.user = user
+        self.text = text
+
+
+    @staticmethod
+    def _get_date_str(timestamp, show_date=False):
+        """Convert UTC datetime into user interface string."""
+        fmt = MESSAGE_DATETIME_FORMAT if show_date else MESSAGE_TIME_FORMAT
+        return timestamp.astimezone(tz=None).strftime(fmt)
+
+    def __lt__(self, other):
+        return self.timestamp < other.timestamp
+
+    @staticmethod
+    def from_conversation_event(conversation, conv_event, prev_conv_event):
+        """Return MessageWidget representing a ConversationEvent.
+
+        Returns None if the ConversationEvent does not have a widget
+        representation.
+        """
+        user = conversation.get_user(conv_event.user_id)
+        # Check whether the previous event occurred on the same day as this
+        # event.
+        if prev_conv_event is not None:
+            is_new_day = (conv_event.timestamp.astimezone(tz=None).date() !=
+                          prev_conv_event.timestamp.astimezone(tz=None).date())
+        else:
+            is_new_day = False
+        if isinstance(conv_event, hangups.ChatMessageEvent):
+            return Message(conv_event.timestamp, conv_event.text, user,
+                                 show_date=is_new_day)
+        elif isinstance(conv_event, hangups.RenameEvent):
+            if conv_event.new_name == '':
+                text = ('{} cleared the conversation name'
+                        .format(user.first_name))
+            else:
+                text = ('{} renamed the conversation to {}'
+                        .format(user.first_name, conv_event.new_name))
+            return Message(conv_event.timestamp, text,
+                                 show_date=is_new_day)
+        elif isinstance(conv_event, hangups.MembershipChangeEvent):
+            event_users = [conversation.get_user(user_id) for user_id
+                           in conv_event.participant_ids]
+            names = ', '.join([user.full_name for user in event_users])
+            if conv_event.type_ == hangups.MEMBERSHIP_CHANGE_TYPE_JOIN:
+                text = ('{} added {} to the conversation'
+                        .format(user.first_name, names))
+            else:  # LEAVE
+                text = ('{} left the conversation'.format(names))
+            return Message(conv_event.timestamp, text,
+                                 show_date=is_new_day)
+        else:
+            return None
+
 
 
 def main():
