@@ -52,13 +52,32 @@ class Cli(object):
 
     def get_conversations(self):
         convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
-        return "\n".join([get_conv_name(conv) for conv in convs])
+        return "\n".join([str(conv.id_) + " : " + get_conv_name(conv) for conv in convs])
+
+    def get_conversation(self, conversation_id):
+        conversation = self.conv_list.get(conversation_id)
+        output = ""
+        for event in conversation.get_events():
+            ev = self._is_event_displayable(conversation, event)
+            if ev is not None:
+                output += ev.text() + "\n"
+        return output
+
+    def _is_event_displayable(self, conversation, conv_event):
+        """Return True if the ConversationWidget is displayable."""
+        widget = MessageWidget.from_conversation_event(conversation,
+                                                       conv_event, None)
+        return widget is not None
 
     def print_output(self):
         output = None
 
-        if True:
+        command = "get_conversation"
+
+        if command == "get_conversations":
             output = self.get_conversations()
+        else:
+            output = self.get_conversation(self.conv_list.get_all()[0].id_)
 
         print(output)
 
@@ -71,12 +90,12 @@ class Cli(object):
 def main():
     """ Main Function """
     # Build default paths for files.
-    dirs = appdirs.AppDirs('QHangups', 'QHangups')
+    dirs = appdirs.AppDirs('hangups_cli', 'hangups_cli')
     default_log_path = os.path.join(dirs.user_data_dir, 'hangups.log')
     default_token_path = os.path.join(dirs.user_data_dir, 'refresh_token.txt')
 
     # Setup command line argument parser
-    parser = argparse.ArgumentParser(prog='qhangups',
+    parser = argparse.ArgumentParser(prog='hangups_cli',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--debug', action='store_true',
                         help='log detailed debugging messages')
