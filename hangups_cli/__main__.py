@@ -2,7 +2,6 @@
 # PYTHON_ARGCOMPLETE_OK
 
 import sys, os, logging, argparse, asyncio, argcomplete
-
 import appdirs
 import hangups
 from hangups.ui.utils import get_conv_name
@@ -239,32 +238,38 @@ def main():
     user_path = os.path.join(dirs.user_data_dir, 'user_list.txt')
 
     conversation_map = {}
-    with open(conversation_path, 'r') as conv_file:
-        for line in conv_file.readlines():
-            split = line.split(':')
-            key = split[1].strip().replace(" ", "_")
-            value = split[0].strip()
-            if key in conversation_map:
-                count = 1
-                while key + "_" +  str(count) in conversation_map:
-                    count += 1
-                conversation_map[key + "_" + str(count)] = value
-            else:
-                conversation_map[key] = value
+    try:
+        with open(conversation_path, 'r') as conv_file:
+            for line in conv_file.readlines():
+                split = line.split(':')
+                key = split[1].strip().replace(" ", "_")
+                value = split[0].strip()
+                if key in conversation_map:
+                    count = 1
+                    while key + "_" +  str(count) in conversation_map:
+                        count += 1
+                    conversation_map[key + "_" + str(count)] = value
+                else:
+                    conversation_map[key] = value
+    except FileNotFoundError as err:
+        pass
 
     user_map = {}
-    with open(user_path, 'r') as user_file:
-        for line in user_file.readlines():
-            split = line.split(':')
-            key = split[1].strip().replace(" ", "_")
-            value = split[0].strip()
-            if key in user_map:
-                count = 1
-                while key + "_" +  str(count) in user_map:
-                    count += 1
-                user_map[key + "_" + str(count)] = value
-            else:
-                user_map[key] = value
+    try:
+        with open(user_path, 'r') as user_file:
+            for line in user_file.readlines():
+                split = line.split(':')
+                key = split[1].strip().replace(" ", "_")
+                value = split[0].strip()
+                if key in user_map:
+                    count = 1
+                    while key + "_" +  str(count) in user_map:
+                        count += 1
+                    user_map[key + "_" + str(count)] = value
+                else:
+                    user_map[key] = value
+    except FileNotFoundError as err:
+        pass
 
     conversation_choices = sorted(list(conversation_map.keys()),
                                   key=lambda x:'zzz' + x if x[:7] == "Unknown" else x)
@@ -274,6 +279,8 @@ def main():
     # Setup command line argument parser
     parser = argparse.ArgumentParser(prog='hangups_cli',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.set_defaults(which='None')
+
 
     subparsers = parser.add_subparsers(help="sub-command help")
 
@@ -330,6 +337,8 @@ def main():
     elif args.which == 'get':
         command.append('get')
         command.append(['conversation', conversation_map[args.conversation]])
+    else:
+        command.append(None)
 
     optional_command = set()
     if args.update is not None:

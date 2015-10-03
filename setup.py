@@ -22,7 +22,8 @@ setup(
         ],
     },
     install_requires=[
-        "hangups>=0.2.8",
+        "hangups>=0.3",
+        "argcomplete>=1.0.0"
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
