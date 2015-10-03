@@ -11,13 +11,13 @@ Installation
 
 hangups_cli is not yet on pypi and can only be installed from source
 
-::
+setup ::
    $ pythons setup.py install
 
 Auto complete
 ^^^^^^^^^^^^^
 
-hangups_cli supports autocompletion of conversation names for both
+hangups_cli supports tab autocompletion of conversation names for both
 sending and recieving messages.
 
 After having installed hangups_cli as described above the directions
@@ -27,7 +27,7 @@ outline `here
 Auto complete options will only appear after running the program an
 intial time
 
-::
+setup ::
    $ hangups_cli
 
 
