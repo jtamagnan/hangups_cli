@@ -63,6 +63,8 @@ class Cli(object):
             yield from self.get(self.command[1])
         elif self.command[0] == 'send':
             yield from self.send(self.command[1], self.command[2])
+        elif self.command[0] == 'all':
+            yield from self.print_conversations()
 
     @asyncio.coroutine
     def parse_optional_command(self):
@@ -91,18 +93,51 @@ class Cli(object):
     def save_conversations_list(self):
         """Save the list of conversations, useful for autocomplete"""
         with open(self.conversation_path, 'w') as conv_file:
-            conv_file.write(self.get_conversations())
+            conv_file.write(self.get_conversations_with_id())
         with open(self.user_path, 'w') as user_file:
             user_file.write(self.get_users())
 
-    def get_conversations(self):
+    def get_conversations_with_id(self):
         """Get the list of conversation as text"""
         convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
-        return "\n".join([str(conv.id_) + " : " + get_conv_name(conv) for conv in convs])
+        conversation_map = {}
+        for conv in convs:
+            value = get_conv_name(conv).replace(" ", "_")
+            key = conv
+            if value in conversation_map.values():
+                count = 1
+                while value + "_" +  str(count) in conversation_map.values():
+                    count += 1
+                conversation_map[key] = value + "_" + str(count)
+            else:
+                conversation_map[key] = value
+
+        return "\n".join([conv.id_ + " : " + conversation_map[conv] for conv in convs])
+
+    def print_conversations(self):
+        """Get the list of conversation as text"""
+        print(self.get_conversations_with_id())
 
     def get_users(self):
         """Get the list of users as text"""
-        return "\n".join([str(user.id_) + " : " + user.full_name for user in self.user_list.get_all()])
+
+
+        user_map = {}
+        for user in self.user_list.get_all():
+            key = user.id_
+            value = user.full_name
+            if key in user_map:
+                count = 1
+                while key + "_" +  str(count) in user_map:
+                    count += 1
+                user_map[key + "_" + str(count)] = value
+            else:
+                user_map[key] = value
+
+        users = sorted(list(user_map.items()),
+                              key=lambda x:'zzz' + x[1] if x[1][:7] == "Unknown" else x[1])
+
+        return "\n".join([str(user[0]) + " : " + str(user[1]) for user in users])
 
     @asyncio.coroutine
     def get_conversation(self, get_info):
@@ -247,13 +282,7 @@ def main():
                 split = line.split(':')
                 key = split[1].strip().replace(" ", "_")
                 value = split[0].strip()
-                if key in conversation_map:
-                    count = 1
-                    while key + "_" +  str(count) in conversation_map:
-                        count += 1
-                    conversation_map[key + "_" + str(count)] = value
-                else:
-                    conversation_map[key] = value
+                conversation_map[key] = value
     except FileNotFoundError as err:
         pass
 
@@ -264,13 +293,7 @@ def main():
                 split = line.split(':')
                 key = split[1].strip().replace(" ", "_")
                 value = split[0].strip()
-                if key in user_map:
-                    count = 1
-                    while key + "_" +  str(count) in user_map:
-                        count += 1
-                    user_map[key + "_" + str(count)] = value
-                else:
-                    user_map[key] = value
+                user_map[key] = value
     except FileNotFoundError as err:
         pass
 
@@ -343,7 +366,7 @@ def main():
         command.append('get')
         command.append(['conversation', conversation_map[args.conversation], args.number])
     else:
-        command.append(None)
+        command.append(['all'])
 
     optional_command = set()
     if args.update is not None:
