@@ -9,7 +9,7 @@ from hangups.ui.utils import get_conv_name
 # Basic settings
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 MESSAGE_TIME_FORMAT = '(%I:%M:%S %p)'
-MESSAGE_DATETIME_FORMAT = '\n< %y-%m-%d >\n(%I:%M:%S %p)'
+MESSAGE_DATETIME_FORMAT = '< %y-%m-%d > (%I:%M:%S %p)'
 
 class Cli(object):
     """QHangups main widget (icon in system tray)"""
@@ -49,9 +49,7 @@ class Cli(object):
     def on_connect(self):
         """Handle connecting for the first time (callback)"""
         # print('Connected')
-        self.user_list, self.conv_list = yield from hangups.build_user_conversation_list(
-            self.client
-        )
+        self.user_list, self.conv_list = yield from hangups.build_user_conversation_list( self.client )
 
         yield from self.parse_command()
         yield from self.parse_optional_command()
@@ -76,7 +74,7 @@ class Cli(object):
     def get(self, command):
         """Print out output from get command"""
         if command[0] == 'conversation':
-            output = yield from self.get_conversation(command[1])
+            output = yield from self.get_conversation(command[1:])
             print(output)
 
     @asyncio.coroutine
@@ -107,19 +105,19 @@ class Cli(object):
         return "\n".join([str(user.id_) + " : " + user.full_name for user in self.user_list.get_all()])
 
     @asyncio.coroutine
-    def get_conversation(self, conversation_id):
+    def get_conversation(self, get_info):
         """Get a conversation by id"""
+        conversation_id = get_info[0]
+        max_events = get_info[1]
         conversation = self.conv_list.get(conversation_id)
-        print(get_conv_name(conversation))
         event0 = conversation._events[0]
-        events = yield from conversation.get_events(event0.id_)
+        events = yield from conversation.get_events(event0.id_, max_events)
         events.append(event0)
-        print(len(events))
         output = ""
         for event in events:
             ev = Message.from_conversation_event(conversation, event, None)
             if ev is not None:
-                output += str(ev.text) + "\n"
+                output += str(ev) + "\n"
         return output
 
     @asyncio.coroutine
@@ -182,6 +180,11 @@ class Message(object):
 
     def __lt__(self, other):
         return self.timestamp < other.timestamp
+
+    def __str__(self):
+        output = "{} | {:10} | {}".format(self._get_date_str(self.timestamp, show_date=True),
+                   self.text[1][1], self.text[2][1])
+        return output
 
     @staticmethod
     def from_conversation_event(conversation, conv_event, prev_conv_event):
@@ -303,10 +306,12 @@ def main():
 
     get_message = subparsers.add_parser("get", help="Get Messages")
     get_message.set_defaults(which='get')
+    get_message.add_argument('-n', '--number', help="Number of texts to get", default=50, type=int)
     required = get_message.add_argument_group("Required")
     required.add_argument("-c", '--conversation', choices=conversation_choices,
                           help="Which Conversation To Read",
                           metavar="Conversation", required=True)
+
 
     parser.add_argument('-d', '--debug', action='store_true',
                         help='log detailed debugging messages')
@@ -336,7 +341,7 @@ def main():
         command.append(['message', args.message])
     elif args.which == 'get':
         command.append('get')
-        command.append(['conversation', conversation_map[args.conversation]])
+        command.append(['conversation', conversation_map[args.conversation], args.number])
     else:
         command.append(None)
 
