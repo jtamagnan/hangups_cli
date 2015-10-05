@@ -64,7 +64,7 @@ class Cli(object):
         elif self.command[0] == 'send':
             yield from self.send(self.command[1], self.command[2])
         elif self.command[0] == 'all':
-            yield from self.print_conversations()
+            self.print_conversations()
 
     @asyncio.coroutine
     def parse_optional_command(self):
@@ -114,9 +114,26 @@ class Cli(object):
 
         return "\n".join([conv.id_ + " : " + conversation_map[conv] for conv in convs])
 
+    def get_conversations(self):
+        """Get the list of conversation as text"""
+        convs = sorted(self.conv_list.get_all(), reverse=True, key=lambda c: c.last_modified)
+        conversation_map = {}
+        for conv in convs:
+            value = get_conv_name(conv).replace(" ", "_")
+            key = conv
+            if value in conversation_map.values():
+                count = 1
+                while value + "_" +  str(count) in conversation_map.values():
+                    count += 1
+                conversation_map[key] = value + "_" + str(count)
+            else:
+                conversation_map[key] = value
+
+        return "\n".join([conversation_map[conv] for conv in convs])
+
     def print_conversations(self):
         """Get the list of conversation as text"""
-        print(self.get_conversations_with_id())
+        print(self.get_conversations())
 
     def get_users(self):
         """Get the list of users as text"""
@@ -366,7 +383,7 @@ def main():
         command.append('get')
         command.append(['conversation', conversation_map[args.conversation], args.number])
     else:
-        command.append(['all'])
+        command.append('all')
 
     optional_command = set()
     if args.update is not None:
