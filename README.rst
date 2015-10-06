@@ -7,7 +7,7 @@ implement as many features as possible from the hangups api into a
 command line tool.
 
 It allows for messaging and texting through hangouts and google voice
-respectively
+respectively from the *command line*.
 
 Installation
 ------------
@@ -39,8 +39,8 @@ Emacs Mode
 ----------
 
 There is an emacs mode that uses hangups_cli. After having installed
-hangups_cli (Autocomplete not needed) go to and install which is not
-yet on melpa `hangups.el <http://github.com/jtamagnan/hangups.el>`_
+hangups_cli (Autocomplete not needed) go to and install `hangups.el
+<http://github.com/jtamagnan/hangups.el>`_ which is not yet on melpa.
 
 I try and keep both up to date. Right now hangups.el can load the
 conversation list, read messages from a conversation and send messages
@@ -50,5 +50,5 @@ Disclaimer
 ----------
 
 This software is still very much a work in progress; I have plans: to
-implement more features, clean up the code. Please bare with me and
+implement more features, and clean up the code. Please bare with me and
 don't forget to report any issues.
