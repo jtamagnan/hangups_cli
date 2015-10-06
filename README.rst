@@ -6,13 +6,16 @@ hangups_cli aims to provide a simple command line interface to
 implement as many features as possible from the hangups api into a
 command line tool.
 
+It allows for messaging and texting through hangouts and google voice
+respectively
+
 Installation
 ------------
 
 hangups_cli is not yet on pypi and can only be installed from source
 
-setup ::
-   $ pythons setup.py install
+::
+   $ python setup.py install
 
 Auto complete
 ^^^^^^^^^^^^^
@@ -27,14 +30,23 @@ outline `here
 Auto complete options will only appear after running the program an
 intial time
 
-setup ::
+::
    $ hangups_cli
 
+Emacs Mode
+----------
 
+There is an emacs mode that uses hangups_cli. After having installed
+hangups_cli (Autocomplete not needed) go to and install which is not
+yet on melpa `hangups.el <http://github.com/jtamagnan/hangups.el>`_
+
+I try and keep both up to date. Right now hangups.el can load the
+conversation list, read messages from a conversation and send messages
+to a conversation.
 
 Disclaimer
 ----------
 
 This software is still very much a work in progress; I have plans: to
-implement more features, clean up the code, create an emacs
-mode. Please bare with me and don't forget to report any issues.
+implement more features, clean up the code. Please bare with me and
+don't forget to report any issues.
