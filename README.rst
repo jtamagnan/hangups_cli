@@ -14,7 +14,8 @@ Installation
 
 hangups_cli is not yet on pypi and can only be installed from source
 
-::
+.. code-block:: bash
+
    $ python setup.py install
 
 Auto complete
@@ -30,7 +31,8 @@ outline `here
 Auto complete options will only appear after running the program an
 intial time
 
-::
+.. code-block:: bash
+
    $ hangups_cli
 
 Emacs Mode
