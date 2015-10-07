@@ -63,6 +63,7 @@ class Cli(object):
             yield from self.get(self.command[1])
         elif self.command[0] == 'send':
             yield from self.send(self.command[1], self.command[2])
+
         elif self.command[0] == 'all':
             self.print_conversations()
 
@@ -84,6 +85,8 @@ class Cli(object):
         """Send a message"""
         if to[0] == "conversation":
             yield from self.send_to_conversation(to[1], message[1])
+            output = yield from self.get_conversation((to[1], 50))
+            print(output)
         elif to[0] == "number":
             raise NotImplementedError("Send to number")
         elif to[0] == "user":
@@ -129,7 +132,7 @@ class Cli(object):
             else:
                 conversation_map[key] = value
 
-        return "\n".join([conversation_map[conv] for conv in convs])
+        return "\n".join([str(len(conv.unread_events)) + " | " + conversation_map[conv] for conv in convs])
 
     def print_conversations(self):
         """Get the list of conversation as text"""
@@ -162,7 +165,9 @@ class Cli(object):
         conversation_id = get_info[0]
         max_events = get_info[1]
         conversation = self.conv_list.get(conversation_id)
-        event0 = conversation._events[0]
+        # event0 = conversation._events[0]
+        events = yield from conversation.get_events(None, max_events)
+        event0 = events[-1]
         events = yield from conversation.get_events(event0.id_, max_events)
         events.append(event0)
         output = ""
